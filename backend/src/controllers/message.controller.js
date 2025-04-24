@@ -1,5 +1,6 @@
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
+import ChatRoom from "../models/chatroom.model.js";
 
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
@@ -20,13 +21,44 @@ export const getMessages = async (req, res) => {
   try {
     const { id: userToChatId } = req.params;
     const myId = req.user._id;
+    const { chatRoomId } = req.query;
 
-    const messages = await Message.find({
-      $or: [
-        { senderId: myId, receiverId: userToChatId },
-        { senderId: userToChatId, receiverId: myId },
-      ],
-    });
+    let messages;
+    
+    if (chatRoomId) {
+      // Get messages from a chat room
+      messages = await Message.find({ chatRoomId })
+        .sort({ createdAt: 1 })
+        .populate('senderId', 'fullName profilePic');
+      
+      // Mark messages as read by this user
+      await Message.updateMany(
+        { 
+          chatRoomId,
+          senderId: { $ne: myId },
+          readBy: { $ne: myId }
+        },
+        { $addToSet: { readBy: myId } }
+      );
+    } else {
+      // Get direct messages between two users
+      messages = await Message.find({
+        $or: [
+          { senderId: myId, receiverId: userToChatId },
+          { senderId: userToChatId, receiverId: myId },
+        ],
+      }).sort({ createdAt: 1 });
+      
+      // Mark messages as read by this user
+      await Message.updateMany(
+        { 
+          senderId: userToChatId, 
+          receiverId: myId,
+          readBy: { $ne: myId }
+        },
+        { $addToSet: { readBy: myId } }
+      );
+    }
 
     res.status(200).json(messages);
   } catch (error) {
