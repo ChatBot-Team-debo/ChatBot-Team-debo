@@ -10,7 +10,10 @@ const messageSchema = new mongoose.Schema(
     receiverId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+    },
+    chatRoomId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ChatRoom",
     },
     text: {
       type: String,
@@ -18,6 +21,17 @@ const messageSchema = new mongoose.Schema(
     image: {
       type: String,
     },
+    file: {
+      type: String,
+    },
+    isUdpMessage: {
+      type: Boolean,
+      default: false,
+    },
+    readBy: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    }],
   },
   { timestamps: true }
 );

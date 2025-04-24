@@ -37,7 +37,7 @@ export const getMessages = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image } = req.body;
+    const { text, image, chatRoomId } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
@@ -48,18 +48,44 @@ export const sendMessage = async (req, res) => {
       imageUrl = uploadResponse.secure_url;
     }
 
-    const newMessage = new Message({
+    const messageData = {
       senderId,
-      receiverId,
       text,
       image: imageUrl,
-    });
+      readBy: [senderId], // Sender has read the message
+    };
 
+    // If it's a chat room message
+    if (chatRoomId) {
+      messageData.chatRoomId = chatRoomId;
+    } else {
+      // Direct message
+      messageData.receiverId = receiverId;
+    }
+
+    const newMessage = new Message(messageData);
     await newMessage.save();
 
-    const receiverSocketId = getReceiverSocketId(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("newMessage", newMessage);
+    // If it's a chat room message, notify all participants
+    if (chatRoomId) {
+      // Get the chat room to find all participants
+      const chatRoom = await ChatRoom.findById(chatRoomId);
+      if (chatRoom) {
+        chatRoom.participants.forEach(participantId => {
+          if (participantId.toString() !== senderId.toString()) {
+            const participantSocketId = getReceiverSocketId(participantId);
+            if (participantSocketId) {
+              io.to(participantSocketId).emit("newMessage", newMessage);
+            }
+          }
+        });
+      }
+    } else {
+      // Direct message - notify the receiver
+      const receiverSocketId = getReceiverSocketId(receiverId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("newMessage", newMessage);
+      }
     }
 
     res.status(201).json(newMessage);

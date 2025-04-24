@@ -57,6 +57,12 @@ const seedUsers = [
 
   // Male Users
   {
+    email: "godiab@diab.com",
+    fullName: "Yousef Diab",
+    password: "123456",
+    profilePic: "https://randomuser.me/api/portraits/men/1.jpg",
+  },
+  {
     email: "james.anderson@example.com",
     fullName: "James Anderson",
     password: "123456",
