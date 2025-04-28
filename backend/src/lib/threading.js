@@ -99,36 +99,119 @@ export const processFileInWorker = (filePath, processingFunction, additionalData
 
 // Helper function to handle concurrent chat operations
 export const processChatOperations = async (operations) => {
+  try {
+    // استخدام مدير المهام لتنفيذ العمليات بالتوازي
+    const tasks = operations.map(operation => ({
+      script: `
+        const { parentPort, workerData } = require('worker_threads');
+        
+        const { id, function: fnString, data } = workerData;
+        
+        try {
+          // تنفيذ الدالة المحددة
+          const result = eval(fnString)(data);
+          
+          // إرسال النتيجة إلى الخيط الرئيسي
+          if (result instanceof Promise) {
+            result.then(value => {
+              parentPort.postMessage({ id, success: true, result: value });
+            }).catch(error => {
+              parentPort.postMessage({ id, success: false, error: error.message });
+            });
+          } else {
+            parentPort.postMessage({ id, success: true, result });
+          }
+        } catch (error) {
+          parentPort.postMessage({ id, success: false, error: error.message });
+        }
+      `,
+      data: operation
+    }));
+    
+    // تنفيذ جميع المهام بالتوازي
+    const results = await threadPool.executeParallel(tasks);
+    
+    return results;
+  } catch (error) {
+    console.error('Error in processChatOperations:', error);
+    throw error;
+  }
+};
+// تم استبدال الدالة القديمة بالإصدار المحسن أعلاه
+/* 
+export const processChatOperations_old = async (operations) => {
   const taskScript = `
     const { parentPort, workerData } = require('worker_threads');
     const { operations } = workerData;
-    
     const results = [];
     
-    // Process each operation sequentially within the worker
-    const processOperations = async () => {
-      for (const op of operations) {
-        try {
-          // Execute the operation function
-          const result = await eval(op.function)(op.data);
-          results.push({ success: true, id: op.id, result });
-        } catch (error) {
-          results.push({ success: false, id: op.id, error: error.message });
+    // Process each operation
+    for (const operation of operations) {
+      try {
+        const { id, function: fnString, data } = operation;
+        
+        // Execute the function
+        const result = eval(fnString)(data);
+        
+        // Handle promises
+        if (result instanceof Promise) {
+          result.then(value => {
+            results.push({ id, success: true, result: value });
+          }).catch(error => {
+            results.push({ id, success: false, error: error.message });
+          });
+        } else {
+          results.push({ id, success: true, result });
         }
+      } catch (error) {
+        results.push({ id, success: false, error: error.message });
       }
-      
-      return results;
-    };
+    }
     
-    // Run the operations and send results back
-    processOperations().then(results => {
-      parentPort.postMessage(results);
-    }).catch(err => {
-      parentPort.postMessage([{ success: false, error: err.message }]);
-    });
+    parentPort.postMessage(results);
   `;
   
   return runInWorker(taskScript, { operations });
+};
+
+/**
+ * دالة مساعدة لمعالجة الملفات بشكل متزامن
+ * @param {Array} files - مصفوفة من الملفات المراد معالجتها
+ * @param {Function} processingFunction - دالة المعالجة
+ * @returns {Promise} وعد يتم حله عند اكتمال المعالجة
+ */
+export const processFilesInParallel = async (files, processingFunction) => {
+  try {
+    const tasks = files.map(file => ({
+      script: `
+        const { parentPort, workerData } = require('worker_threads');
+        const fs = require('fs');
+        const path = require('path');
+        
+        const { filePath, processingFunction } = workerData;
+        
+        fs.readFile(filePath, (err, data) => {
+          if (err) {
+            parentPort.postMessage({ success: false, error: err.message, filePath });
+            return;
+          }
+          
+          try {
+            const result = eval(processingFunction)(data, filePath);
+            parentPort.postMessage({ success: true, result, filePath });
+          } catch (error) {
+            parentPort.postMessage({ success: false, error: error.message, filePath });
+          }
+        });
+      `,
+      data: { filePath: file, processingFunction: processingFunction.toString() }
+    }));
+    
+    return await threadPool.executeParallel(tasks);
+  } catch (error) {
+    console.error('Error in processFilesInParallel:', error);
+    throw error;
+  }
 };
 
 // Export the worker pool for direct access if needed

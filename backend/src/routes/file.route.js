@@ -17,7 +17,7 @@ const storage = multer.diskStorage({
 });
 
 // Create temp directory if it doesn't exist
-const fs = require('fs');
+import fs from 'fs';
 const tempDir = path.join(process.cwd(), 'temp');
 if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });

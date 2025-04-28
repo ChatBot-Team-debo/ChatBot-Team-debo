@@ -12,6 +12,7 @@ import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.route.js";
 import fileRoutes from "./routes/file.route.js";
 import chatRoutes from "./routes/chat.route.js";
+import networkRoutes from "./routes/network.routes.js";
 import { app, server } from "./lib/socket.js";
 
 // dotenv.config();
@@ -37,6 +38,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/files", fileRoutes);
 app.use("/api/chats", chatRoutes);
+app.use("/api/network", networkRoutes);
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
@@ -55,5 +57,7 @@ server.listen(PORT, () => {
   
   // Initialize UDP and TCP servers
   const networkServers = initNetworkServers(parseInt(PORT));
-  console.log("UDP and TCP servers initialized");
+  console.log("UDP server running on port: " + (parseInt(PORT) + 1));
+  console.log("TCP server running on port: " + (parseInt(PORT) + 2));
+  console.log("UDP and TCP servers initialized successfully");
 });

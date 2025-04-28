@@ -2,24 +2,34 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    email: {
+    username: {
       type: String,
       required: true,
       unique: true,
     },
-    fullName: {
+    email: {
       type: String,
       required: true,
+      unique: true,
     },
     password: {
       type: String,
       required: true,
       minlength: 6,
     },
-    profilePic: {
+    avatar: {
       type: String,
       default: "",
     },
+    status: {
+      type: String,
+      enum: ['online', 'offline'],
+      default: 'offline'
+    },
+    lastSeen: {
+      type: Date,
+      default: Date.now
+    }
   },
   { timestamps: true }
 );

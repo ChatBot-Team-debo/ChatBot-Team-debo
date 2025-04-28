@@ -3,6 +3,9 @@ import net from 'net';
 import fs from 'fs';
 import path from 'path';
 import { Worker } from 'worker_threads';
+import threadPool from './thread-pool.js';
+import tcpClient from './tcp-client.js';
+import udpClient from './udp-client.js';
 import { io, getReceiverSocketId } from './socket.js';
 
 // Create uploads directory if it doesn't exist
@@ -13,6 +16,18 @@ if (!fs.existsSync(uploadsDir)) {
 
 // UDP Server for quick message delivery
 const udpServer = dgram.createSocket('udp4');
+
+// تصدير دالة لإرسال رسائل UDP
+export const sendUdpMessage = async (messageData) => {
+  try {
+    // استخدام عميل UDP لإرسال الرسالة
+    await udpClient.sendMessage(messageData);
+    return true;
+  } catch (error) {
+    console.error('Error sending UDP message:', error);
+    throw error;
+  }
+};
 
 udpServer.on('error', (err) => {
   console.log(`UDP Server error:\n${err.stack}`);
@@ -44,6 +59,18 @@ udpServer.on('listening', () => {
   const address = udpServer.address();
   console.log(`UDP server listening on ${address.address}:${address.port}`);
 });
+
+// تصدير دالة لإرسال الملفات عبر TCP
+export const sendFileViaTcp = async (filePath, fileInfo) => {
+  try {
+    // استخدام عميل TCP لإرسال الملف
+    await tcpClient.sendFile(filePath, fileInfo);
+    return true;
+  } catch (error) {
+    console.error('Error sending file via TCP:', error);
+    throw error;
+  }
+};
 
 // TCP Server for file transfers
 const tcpServer = net.createServer((socket) => {
@@ -139,56 +166,4 @@ export const initNetworkServers = (port = 3000) => {
     udpServer,
     tcpServer
   };
-};
-
-// Client functions for sending messages and files
-export const sendUdpMessage = (message, host = 'localhost', port = 3001) => {
-  return new Promise((resolve, reject) => {
-    const client = dgram.createSocket('udp4');
-    const data = Buffer.from(JSON.stringify(message));
-    
-    client.send(data, 0, data.length, port, host, (err) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve();
-      }
-      client.close();
-    });
-  });
-};
-
-export const sendFileViaTcp = (filePath, fileInfo, host = 'localhost', port = 3002) => {
-  return new Promise((resolve, reject) => {
-    const client = new net.Socket();
-    
-    client.connect(port, host, () => {
-      console.log('Connected to TCP server');
-      
-      // First send file metadata
-      const metaData = JSON.stringify(fileInfo) + '\n';
-      client.write(metaData);
-      
-      // Then send the file data
-      const fileStream = fs.createReadStream(filePath);
-      
-      fileStream.on('data', (chunk) => {
-        client.write(chunk);
-      });
-      
-      fileStream.on('end', () => {
-        client.end();
-        resolve();
-      });
-      
-      fileStream.on('error', (err) => {
-        client.destroy();
-        reject(err);
-      });
-    });
-    
-    client.on('error', (err) => {
-      reject(err);
-    });
-  });
 };
